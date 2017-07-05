@@ -1,12 +1,23 @@
 package io.xoana.beautifulday;
 
 import java.io.*
-import java.net.InetSocketAddress
 import java.util.*
 
 /**
  * Created by jcatrambone on 6/16/17.
  */
+
+data class Result(val id:Int, val distance:Float) : Comparable<Result> {
+	override fun compareTo(other: Result): Int {
+		if(this.distance < other.distance) {
+			return -1
+		} else if(this.distance == other.distance) {
+			return 0 // TODO: Float compare?  Hmm.
+		} else {
+			return 1
+		}
+	}
+}
 
 data class Query(val qid:Int, val maxResults:Int=Int.MAX_VALUE, val point:DataPoint? = null, val distanceMetric: DistanceMetric? = null) : Serializable
 
@@ -15,17 +26,9 @@ class ResultSet(val query:Query) : Serializable {
 	private val distances = FloatArray(query.maxResults, { _ -> Float.MAX_VALUE })
 	private val ids = IntArray(query.maxResults, { _ -> -1 })
 
-	fun getResultIDs(): IntArray {
-		return ids.copyOf()
-	}
-
-	fun getResultDistances(): FloatArray {
-		return distances.copyOf()
-	}
-
-	fun getResultIDDistancePairs(): Array<Pair<Int,Float>> {
-		return Array<Pair<Int, Float>>(query.maxResults, { i ->
-			Pair(ids[i], distances[i])
+	fun getResults(): Array<Result> {
+		return Array<Result>(query.maxResults, { i ->
+			Result(ids[i], distances[i])
 		})
 	}
 
@@ -67,7 +70,7 @@ class ResultSet(val query:Query) : Serializable {
 		// insertionIndex = (-(insertion point) - 1)
 		// a = {0, 2, 4, 6, 8}
 		// binsearch(0) = 0, binsearch(-1) = -1, binsearch(1) = -2, binsearch(10) = -6
-		if(insertionIndex > query.maxResults-1) {
+		if(resultCount >= this.query.maxResults && insertionIndex >= resultCount) { // query.maxResults-1) {
 			// Do nothing.
 			return
 		}
@@ -78,7 +81,7 @@ class ResultSet(val query:Query) : Serializable {
 		}
 		ids[insertionIndex] = id
 		distances[insertionIndex] = distance
-		resultCount++
+		resultCount = Math.min(resultCount+1, ids.size) // Cap the result count.
 	}
 
 	fun toByteArray(): ByteArray {

@@ -45,7 +45,7 @@ class BDMaster(listeningPort:Int) {
 		return submitQuery(pt, metric, numResults)
 	}
 
-	fun getQueryResults(qid:Int): Array<Pair<Int,Float>>? {
+	fun getQueryResults(qid:Int): Array<Result>? {
 		if(activeQueries[qid] == null) {
 			return null // Not yet processed.  Waiting for worker to accept job.
 		}
@@ -53,7 +53,7 @@ class BDMaster(listeningPort:Int) {
 		if(workerReportsLeftToQueryCompletion[qid]?.isEmpty() ?: false) {
 			synchronized(activeQueries, {
 				val response = activeQueries.remove(qid)!!
-				return response.getResultIDDistancePairs()
+				return response.getResults()
 				// TODO: Make sure this releases the lock.
 			})
 		}
