@@ -83,39 +83,6 @@ class ResultSet(val query:Query) : Serializable {
 		distances[insertionIndex] = distance
 		resultCount = Math.min(resultCount+1, ids.size) // Cap the result count.
 	}
-
-	fun toByteArray(): ByteArray {
-		// TODO: Is it more efficient to include the min and max as part of serialization or calculate on the fly?
-		val stream = ByteArrayOutputStream()
-		val dout = DataOutputStream(stream)
-
-		dout.writeInt(query.qid)
-		dout.writeInt(query.maxResults)
-		dout.writeInt(this.resultCount)
-		for(i in 0 until this.resultCount) {
-			dout.writeInt(ids[i])
-			dout.writeFloat(distances[i])
-		}
-		return stream.toByteArray()
-	}
-
-	companion object {
-		@JvmStatic
-		fun fromByteArray(data: ByteArray): ResultSet {
-			val stream = ByteArrayInputStream(data)
-			val din = DataInputStream(stream)
-
-			val qid = din.readInt()
-			val maxResults = din.readInt()
-			val numResults = din.readInt()
-			val res = ResultSet(Query(qid, maxResults))
-			for(i in 0 until numResults) {
-				res.ids[i] = din.readInt()
-				res.distances[i] = din.readFloat()
-			}
-			return res
-		}
-	}
 }
 
 data class DataPoint(val id:Int, val data:FloatArray) : Serializable {

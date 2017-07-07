@@ -1,7 +1,12 @@
 package io.xoana.beautifulday
 
+import io.javalin.Context
 import io.javalin.Javalin
+import java.io.FileNotFoundException
+import java.io.IOException
 import java.net.InetSocketAddress
+import java.net.URLDecoder
+import java.util.concurrent.atomic.AtomicBoolean
 
 
 /**
@@ -32,16 +37,18 @@ fun main(args: Array<String>) {
 		val port = findArgumentAfterString("-p", args, "9876").toInt()
 		val host = findArgumentAfterString("-h", args, "")
 		val datafile = findArgumentAfterString("-d", args, "")
-		if(datafile != "") {
-			TODO("Datafile target is not yet implemented.")
-		}
 		println("Starting worker.  Connecting to master at $host:$port");
 		val w = BDWorker(InetSocketAddress(host, port))
+		w.storageFile = datafile
+		try {
+			w.loadFromDisk()
+		} catch(fnfe: FileNotFoundException) {} // Expected if it's the first start.
 		w.main()
 	} else if(args[0].equals("master", true)) {
 		// Open our master...
-		val port = findArgumentAfterString("-p", args, "9876").toInt()
-		val m = BDMaster(port)
+		val workerListenPort = findArgumentAfterString("-p", args, "9876").toInt()
+		val restListenPort = findArgumentAfterString("--webport", args, "8888").toInt()
+		val m = BDMaster(workerListenPort)
 		m.main()
 
 		// Build and attach a CLI.
@@ -53,12 +60,15 @@ fun main(args: Array<String>) {
 		terminal.setCursorVisible(false)
 		val textGraphics = terminal.newTextGraphics()
 		*/
+
 		// Set paths.
-		val app:Javalin = Javalin.create().port(7000);
+		val quit = AtomicBoolean(false)
+		val app:Javalin = Javalin.create().port(restListenPort);
 		app.get("/ping", {ctx -> ctx.result("Pong")});
-		app.post("/add/:id/:point", {ctx ->
-			val id = ctx.param("id")!!.toInt()
-			val pointString = ctx.param("point")!!
+		app.post("/add", {ctx ->
+			// If the URL doesn't provide point, must be in body.
+			val id = (ctx.param("id") ?: ctx.bodyParam("id"))!!.toInt()
+			val pointString = ctx.param("point") ?: URLDecoder.decode(ctx.bodyParam("point")!!, "UTF-8")
 			val data = pointString.split(',').map { it.toFloat() }.toFloatArray()
 			val point = DataPoint(id, data)
 
@@ -68,30 +78,39 @@ fun main(args: Array<String>) {
 			ctx.result("ok")
 			println("Added point $id")
 		})
+		// Finding via the get method (which accepts params as args.)
 		app.get("/find/:k/:point", {ctx ->
 			val k = ctx.param("k")!!.toInt()
 			val pointString = ctx.param("point")!!
 			val data = pointString.split(',').map { it.toFloat() }.toFloatArray()
-			val qid = m.submitQuery(data, DistanceMetric.EUCLIDEAN, k)
 
-			println("QUERY $qid launched query for top $k points.")
-			var tempResultSet:Array<Result>? = null
-			while(tempResultSet == null) {
-				tempResultSet = m.getQueryResults(qid)
-				Thread.yield()
-			}
-			println("QUERY $qid returned")
+			find(m, ctx, k, data, DistanceMetric.EUCLIDEAN)
+		})
+		app.post("/find", {ctx ->
+			val k = ctx.bodyParam("k")!!.toInt()
+			val pointString = URLDecoder.decode(ctx.bodyParam("point")!!, "UTF-8")
+			val data = pointString.split(",").map {it.toFloat() }.toFloatArray()
 
-			val resultSet = tempResultSet
-			ctx.json(resultSet)
+			find(m, ctx, k, data, DistanceMetric.EUCLIDEAN)
+		})
+		// Maybe we shouldn't expose this.
+		app.post("/shutdown", {ctx ->
+			quit.set(true)
+			ctx.status(200)
+			ctx.result("ok")
 		})
 
 		//terminal.addResizeListener()
 		//readInput is blocking.  pollInput is async and returns null if there's nothing.
 		println("Server is up.  It's a beautiful day in my neighborhood.")
-		var quit = false
-		while(!quit) {
-			Thread.yield()
+		println("Listening for workers on $workerListenPort")
+		println("Listening for REST requests on $restListenPort")
+		while(!quit.get()) {
+			try {
+				Thread.sleep(1000)
+			} catch (ie:InterruptedException) {
+				quit.set(true)
+			}
 			/*
 			textGraphics.foregroundColor = TextColor.ANSI.YELLOW
 			textGraphics.putString(0, 0, "BeautifulDay Master : Listening on $port")
@@ -112,15 +131,29 @@ fun main(args: Array<String>) {
 		terminal.exitPrivateMode()
 		terminal.resetColorAndSGR()
 		terminal.close()
+		*/
 		println("Shutting down...")
 		m.shutdown()
 		println("Have a nice day.")
 		System.exit(0)
-		*/
 	} else {
 		println("Unrecognized running mode: $args[0]")
 		println(USAGE)
 	}
+}
+
+private fun find(m:BDMaster, ctx: Context, k:Int, data:FloatArray, metric:DistanceMetric) {
+	val qid = m.submitQuery(data, metric, k)
+	println("QUERY $qid launched query for top $k points.")
+	var tempResultSet:Array<Result>? = null
+	while(tempResultSet == null) {
+		tempResultSet = m.getQueryResults(qid)
+		Thread.yield()
+	}
+	println("QUERY $qid returned")
+
+	val resultSet = tempResultSet
+	ctx.json(resultSet)
 }
 
 // This could use some explanation.
