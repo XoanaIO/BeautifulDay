@@ -1,9 +1,6 @@
 package io.xoana.beautifulday
 
-import java.io.InputStream
-import java.io.ObjectInputStream
-import java.io.ObjectOutputStream
-import java.io.OutputStream
+import java.io.*
 import java.net.InetSocketAddress
 import java.net.Socket
 
@@ -12,6 +9,8 @@ import java.net.Socket
  */
 
 class BDWorker(val master: InetSocketAddress) {
+	var storageFile: String = ""
+
 	val index = mutableMapOf<Int, Int>()
 	val data = mutableListOf<DataPoint>()
 
@@ -47,15 +46,22 @@ class BDWorker(val master: InetSocketAddress) {
 		while(!quit && sock.isConnected && !sock.isClosed) {
 			// Read a command from thread master.
 			// Don't need the BufferedReader(InputStreamReader()) wrapper here 'cause Kotlin!
-
-			val rawMsg:Any? = oin.readObject()
+			var rawMsg: Any? = null
+			try {
+				rawMsg = oin.readObject()
+			} catch(eofe:EOFException) {
+				println("BDWorker: EOF while waiting for message.  Assuming shutdown.")
+				rawMsg = ShutdownMessage()
+			}
 			if(rawMsg == null) {
 				println("BDWorker: Got a null object read.  What the hell?")
 				continue
 			}
+
+			// Translate message
 			val msg:NetworkMessage = rawMsg as NetworkMessage
 			when (msg.type) {
-				NetworkMessageType.REGISTER -> null // Do we want to handle this?
+				NetworkMessageType.REGISTER -> Unit // Do we want to handle this?
 				NetworkMessageType.ADD -> addPoint((msg as AddMessage).point)
 				NetworkMessageType.FIND_K_NEAREST -> performSearch(messageToQuery(msg))
 				NetworkMessageType.REMOVE -> TODO()
@@ -64,11 +70,9 @@ class BDWorker(val master: InetSocketAddress) {
 					saveToDisk()
 					quit = true
 					sock.close()
-					null
 				}
 				else -> {
 					Exception("Unhandled network message.  Type: ${msg.type}")
-					null
 				}
 			}
 		}
@@ -102,11 +106,27 @@ class BDWorker(val master: InetSocketAddress) {
 		oout.writeObject(results)
 	}
 
-	fun loadFromDisk(filename:String = "") {
-
+	// NOTE: We allow the user to override filename because sometimes you'll want to read from a different file at startup.
+	fun loadFromDisk(filename:String = storageFile) {
+		val fin = File(filename).bufferedReader()
+		fin.lines().forEach { line ->
+			val tokens = line.split('\t')
+			val id = tokens[0].toInt()
+			val data = tokens[1]
+			val dp = DataPoint(id, data.split(',').map { it.toFloat() }.toFloatArray())
+			addPoint(dp)
+		}
+		fin.close()
 	}
 
-	fun saveToDisk(filename:String = "") {
-
+	fun saveToDisk(filename:String = storageFile) {
+		val fout = File(filename).bufferedWriter()
+		index.forEach { pointIDIndexPair ->
+			fout.write(pointIDIndexPair.key)
+			fout.write("\t")
+			fout.write(data[pointIDIndexPair.value].data.joinToString(separator = ","))
+			fout.write("\n")
+		}
+		fout.close()
 	}
 }

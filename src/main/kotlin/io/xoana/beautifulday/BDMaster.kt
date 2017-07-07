@@ -68,7 +68,9 @@ class BDMaster(listeningPort:Int) {
 
 	fun shutdown() {
 		// Send a shutdown to all workers.
-		workers.forEach { pendingWorkerMessages[it]!!.add(ShutdownMessage()) }
+		synchronized(pendingWorkerMessages) {
+			workers.forEach { pendingWorkerMessages[it]!!.add(ShutdownMessage()) }
+		}
 		// Set terminate status.
 		this.quit = true;
 		val regThread = listenerThreads.removeAt(0) // This is our registration listener.  Special handling.
@@ -114,6 +116,7 @@ class BDMaster(listeningPort:Int) {
 				synchronized(workers, { workers.add(socket) })
 				synchronized(workerLastReportTime, { workerLastReportTime[socket] = System.currentTimeMillis() })
 				synchronized(pendingWorkerMessages, { pendingWorkerMessages[socket] = mutableListOf<NetworkMessage>() })
+				oout.flush()
 			}
 
 			while (socket.isConnected && !socket.isClosed && !quit) {
@@ -127,6 +130,7 @@ class BDMaster(listeningPort:Int) {
 							continue
 						}
 						oout.writeObject(outboundMsg) // Write the message.
+						oout.flush()
 						// Then deal with the fallout and followup.
 						when(outboundMsg.type) {
 							NetworkMessageType.ADD -> null // Nothing else needed.
