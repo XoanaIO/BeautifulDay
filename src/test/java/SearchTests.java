@@ -74,7 +74,7 @@ public class SearchTests {
 			System.out.println("Querying master for point.  Test " + i);
 			long startTime = System.currentTimeMillis();
 			int qid = master.submitQuery(makeRandomPoint(5), DistanceMetric.EUCLIDEAN, 3);
-			Pair<Integer, Float>[] results = null;
+			Result[] results = null;
 			while (results == null) {
 				try {
 					Thread.sleep(100);
@@ -105,16 +105,16 @@ public class SearchTests {
 			res.addResultToSet(ids[i], distances[i]);
 		}
 		// Fetch them.  Should be in sorted order.
-		float[] resultDistances = res.getResultDistances();
+		Result[] results = res.getResults();
 		for(int i=0; i < 5; i++) {
 			// This should be less than all greater distances in the result set.
 			for(int j=i; j < 5; j++) {
-				Assert.assertTrue(resultDistances[i] <= resultDistances[j]);
+				Assert.assertTrue(results[i].getDistance() <= results[j].getDistance());
 			}
 			// And should be less than 10-(i+1) of the other items.
 			int countOfElementsGreaterThanThis = 0;
 			for(int j=0; j < 10; j++) {
-				if(distances[j] >= resultDistances[i]) {
+				if(distances[j] >= results[i].getDistance()) {
 					countOfElementsGreaterThanThis++;
 				}
 			}

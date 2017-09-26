@@ -138,6 +138,23 @@ enum class DistanceMetric : Serializable {
 		override fun calculateWithCutoff(p1:DataPoint, p2:DataPoint, cutoff:Float):Float? {
 			return null
 		}
+	},
+
+	COSINE {
+		override fun calculate(p1:DataPoint, p2:DataPoint):Float {
+			val p1Magnitude = p1.data.foldRight(0.0f, { v, acc -> acc + v*v } )
+			val p2Magnitude = p2.data.foldRight( 0.0f, { v, acc -> acc + v*v } )
+			val denominator = (Math.sqrt(p1Magnitude.toDouble())*Math.sqrt(p2Magnitude.toDouble())).toFloat()
+			val similarity = p1.data.zip(p2.data).fold(0.0f, { accumulator, (a,b) -> accumulator + a*b })/denominator
+			// Similarity now is -1, 0, or 1 for different, dissimilar, same.
+			// Want to map to distance, so 1, 0.5, 0 OR 0.5, 1.0, 0.0
+			val distance = (1.0f-similarity)*0.5f
+			return distance
+		}
+
+		override fun calculateWithCutoff(p1:DataPoint, p2:DataPoint, cutoff:Float):Float? {
+			return null
+		}
 	};
 
 	abstract fun calculate(p1:DataPoint, p2:DataPoint):Float

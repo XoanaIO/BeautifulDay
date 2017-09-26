@@ -68,4 +68,48 @@ public class DistanceMetricTests {
 		p2 = new DataPoint(2, new float[]{0, 4});
 		Assert.assertEquals(5.0f, DistanceMetric.EUCLIDEAN.calculate(p1, p2), 1.0e-8);
 	}
+
+	@Test
+	public void testCosine() {
+		// Try orthogonal vectors.
+		DataPoint right = new DataPoint(0, new float[]{1.0f, 0.0f});
+		DataPoint up = new DataPoint(1, new float[]{0.0f, 1.0f});
+		DataPoint left = new DataPoint(2, new float[]{-1.0f, 0.0f});
+		DataPoint down = new DataPoint(3, new float[]{0.0f, -1.0f});
+
+		// Cosine DISTANCE not cosine SIMILARITY
+		// 1 = completely different.
+		// 0 = perfectly similar.
+		Assert.assertEquals(0f, DistanceMetric.COSINE.calculate(right, right), 1.0e-8);
+		Assert.assertEquals(0.5f, DistanceMetric.COSINE.calculate(right, up), 1.0e-8);
+		Assert.assertEquals(1f, DistanceMetric.COSINE.calculate(right, left), 1.0e-8);
+		Assert.assertEquals(0.5f, DistanceMetric.COSINE.calculate(right, down), 1.0e-8);
+
+		Assert.assertEquals(0.5f, DistanceMetric.COSINE.calculate(up, right), 1.0e-8);
+		Assert.assertEquals(0f, DistanceMetric.COSINE.calculate(up, up), 1.0e-8);
+		Assert.assertEquals(0.5f, DistanceMetric.COSINE.calculate(up, left), 1.0e-8);
+		Assert.assertEquals(1f, DistanceMetric.COSINE.calculate(up, down), 1.0e-8);
+
+		Assert.assertEquals(1.0f, DistanceMetric.COSINE.calculate(left, right), 1.0e-8);
+		Assert.assertEquals(0.5f, DistanceMetric.COSINE.calculate(left, up), 1.0e-8);
+		Assert.assertEquals(0f, DistanceMetric.COSINE.calculate(left, left), 1.0e-8);
+		Assert.assertEquals(0.5f, DistanceMetric.COSINE.calculate(left, down), 1.0e-8);
+
+		Assert.assertEquals(0.5, DistanceMetric.COSINE.calculate(down, right), 1.0e-8);
+		Assert.assertEquals(1.0f, DistanceMetric.COSINE.calculate(down, up), 1.0e-8);
+		Assert.assertEquals(0.5f, DistanceMetric.COSINE.calculate(down, left), 1.0e-8);
+		Assert.assertEquals(0f, DistanceMetric.COSINE.calculate(down, down), 1.0e-8);
+
+		/*
+		for(float i=0.0f; i < Math.PI*2; i+=0.1f) {
+			for(float j=0.0f; j < Math.PI*2; j+=0.1f) {
+				// i and j are our angles relative to 0-theta.
+				// Calculate x and y, multiply them by random constants.
+				DataPoint p1 = new DataPoint(1, new float[]{(float)Math.cos(i), (float)Math.sin(i)});
+				DataPoint p2 = new DataPoint(2, new float[]{(float)Math.cos(j), (float)Math.sin(j)});
+				Assert.assertEquals(Math.abs(i-j)*(Math.PI/2.0f), DistanceMetric.COSINE.calculate(p1, p2), 1.0e-2);
+			}
+		}
+		*/
+	}
 }

@@ -64,7 +64,7 @@ class BDWorker(val master: InetSocketAddress) {
 				NetworkMessageType.REGISTER -> Unit // Do we want to handle this?
 				NetworkMessageType.ADD -> addPoint((msg as AddMessage).point)
 				NetworkMessageType.FIND_K_NEAREST -> performSearch(messageToQuery(msg))
-				NetworkMessageType.REMOVE -> TODO()
+				NetworkMessageType.REMOVE -> removePoint((msg as RemoveByIDMessage).id)
 				NetworkMessageType.SHUTDOWN -> {
 					// Save our local copy to disk.
 					saveToDisk()
@@ -85,6 +85,13 @@ class BDWorker(val master: InetSocketAddress) {
 		} else {
 			data.add(point)
 			index[point.id] = data.size-1
+		}
+	}
+
+	fun removePoint(id:Int) {
+		if(id in index) {
+			data.removeAt(index[id]!!)
+			index.remove(id)
 		}
 	}
 

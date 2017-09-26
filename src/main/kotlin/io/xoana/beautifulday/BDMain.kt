@@ -13,14 +13,18 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Created by jcatrambone on 6/22/17.
  */
 
+const val DEFAULT_WORKER_PORT = 9876
+const val DEFAULT_WEB_PORT = 8888
 const val USAGE = """
 Beautiful Day Nearest Neighbor Search
 ===
-java -jar bd.jar worker -h host -p port (-d data file name)
-	-h <host> and -p <port> refer to the master node to which they should connect.
-	-d refers to the data file which should be loaded on startup.  If none is specified, will use /tmp/ dir.
-java -jar bd.jar worker -p port
-	-p is the listening port.
+java -jar bd.jar worker -h host [-p port] [-d data file name]
+	-h <host> the master node to which the worker should connect.
+	-p <port> the port number to which this worker should connect.  Default: $DEFAULT_WORKER_PORT.
+	-d refers to the data file which should be loaded on startup.
+java -jar bd.jar master [-p port] [--webport port]
+	-p <port> the port on which the master will listen for worker conneections.  Default: $DEFAULT_WORKER_PORT
+	--webport <port> the port on which the master will listen for rest connections.  Default: $DEFAULT_WEB_PORT
 """
 
 fun main(args: Array<String>) {
@@ -34,7 +38,7 @@ fun main(args: Array<String>) {
 	}
 
 	if(args[0].equals("worker", true)) {
-		val port = findArgumentAfterString("-p", args, "9876").toInt()
+		val port = findArgumentAfterString("-p", args, "$DEFAULT_WORKER_PORT").toInt()
 		val host = findArgumentAfterString("-h", args, "")
 		val datafile = findArgumentAfterString("-d", args, "")
 		println("Starting worker.  Connecting to master at $host:$port");
@@ -46,8 +50,8 @@ fun main(args: Array<String>) {
 		w.main()
 	} else if(args[0].equals("master", true)) {
 		// Open our master...
-		val workerListenPort = findArgumentAfterString("-p", args, "9876").toInt()
-		val restListenPort = findArgumentAfterString("--webport", args, "8888").toInt()
+		val workerListenPort = findArgumentAfterString("-p", args, "$DEFAULT_WORKER_PORT").toInt()
+		val restListenPort = findArgumentAfterString("--webport", args, "$DEFAULT_WEB_PORT").toInt()
 		val m = BDMaster(workerListenPort)
 		m.main()
 
