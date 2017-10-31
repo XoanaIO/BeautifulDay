@@ -127,7 +127,11 @@ class BDWorker(val master: InetSocketAddress) {
 	}
 
 	fun saveToDisk(filename:String = storageFile) {
-		val fout = File(filename).bufferedWriter()
+		val fout = if(storageFile == "") {
+			File.createTempFile("beautilfulday_worker", ".dat").bufferedWriter()
+		} else {
+			File(filename).bufferedWriter()
+		}
 		index.forEach { pointIDIndexPair ->
 			fout.write(pointIDIndexPair.key)
 			fout.write("\t")

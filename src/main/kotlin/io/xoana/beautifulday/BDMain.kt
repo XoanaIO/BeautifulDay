@@ -55,15 +55,14 @@ fun main(args: Array<String>) {
 		val m = BDMaster(workerListenPort)
 		m.main()
 
-		// Build and attach a CLI.
-		/*
-		val defaultTerminalFactory = DefaultTerminalFactory()
-		val terminal = defaultTerminalFactory.createTerminal()
-		terminal.enterPrivateMode() // Should give us a 'fullscreen' window.
-		terminal.clearScreen() // Should happen by default on the above, unless we've got a crap terminal.
-		terminal.setCursorVisible(false)
-		val textGraphics = terminal.newTextGraphics()
-		*/
+		println("Waiting for first workers to connect.")
+		while(m.numWorkers < 1) {
+			try {
+				Thread.sleep(1000)
+			} catch (ie:InterruptedException) {
+				// NOOP
+			}
+		}
 
 		// Set paths.
 		val quit = AtomicBoolean(false)
@@ -71,8 +70,8 @@ fun main(args: Array<String>) {
 		app.get("/ping", {ctx -> ctx.result("Pong")});
 		app.post("/add", {ctx ->
 			// If the URL doesn't provide point, must be in body.
-			val id = (ctx.param("id") ?: ctx.bodyParam("id"))!!.toInt()
-			val pointString = ctx.param("point") ?: URLDecoder.decode(ctx.bodyParam("point")!!, "UTF-8")
+			val id = (ctx.formParam("id") ?: ctx.formParam("id"))!!.toInt()
+			val pointString = ctx.formParam("point") ?: URLDecoder.decode(ctx.formParam("point")!!, "UTF-8")
 			val data = pointString.split(',').map { it.toFloat() }.toFloatArray()
 			val point = DataPoint(id, data)
 
@@ -83,25 +82,28 @@ fun main(args: Array<String>) {
 			println("Added point $id")
 		})
 		// Finding via the get method (which accepts params as args.)
-		app.get("/find/:k/:point", {ctx ->
+		app.get("/find/:k/:metric/:point", {ctx ->
 			val k = ctx.param("k")!!.toInt()
+			val metric = stringToMetric(ctx.param("metric")!!)
 			val pointString = ctx.param("point")!!
 			val data = pointString.split(',').map { it.toFloat() }.toFloatArray()
 
-			find(m, ctx, k, data, DistanceMetric.EUCLIDEAN)
+			find(m, ctx, k, data, metric)
 		})
 		app.post("/find", {ctx ->
-			val k = ctx.bodyParam("k")!!.toInt()
-			val pointString = URLDecoder.decode(ctx.bodyParam("point")!!, "UTF-8")
+			val k = ctx.formParam("k")!!.toInt()
+			val metric = stringToMetric(ctx.formParam("metric")!!)
+			val pointString = URLDecoder.decode(ctx.formParam("point")!!, "UTF-8")
 			val data = pointString.split(",").map {it.toFloat() }.toFloatArray()
 
-			find(m, ctx, k, data, DistanceMetric.EUCLIDEAN)
+			find(m, ctx, k, data, metric)
 		})
 		// Maybe we shouldn't expose this.
 		app.post("/shutdown", {ctx ->
 			quit.set(true)
 			ctx.status(200)
 			ctx.result("ok")
+			app.stop()
 		})
 
 		//terminal.addResizeListener()
@@ -109,33 +111,18 @@ fun main(args: Array<String>) {
 		println("Server is up.  It's a beautiful day in my neighborhood.")
 		println("Listening for workers on $workerListenPort")
 		println("Listening for REST requests on $restListenPort")
+		app.start();
+
+		// Spin until shutdown.
 		while(!quit.get()) {
 			try {
 				Thread.sleep(1000)
 			} catch (ie:InterruptedException) {
-				quit.set(true)
+				quit.set(true);
 			}
-			/*
-			textGraphics.foregroundColor = TextColor.ANSI.YELLOW
-			textGraphics.putString(0, 0, "BeautifulDay Master : Listening on $port")
-			textGraphics.foregroundColor = TextColor.ANSI.DEFAULT
-			textGraphics.putString(0, 1, "Workers connected: ${m.workers.size}")
-			m.workers.forEachIndexed{ i, w ->
-				textGraphics.putString(0, 2+i, "${w.remoteSocketAddress}")
-			}
-			textGraphics.putString(0, terminal.terminalSize.rows-1, "Press Escape to Quit")
-			val keyStroke: KeyStroke? = terminal.pollInput()
-			quit = (keyStroke != null && (keyStroke.keyType == KeyType.Escape))
-			terminal.flush()
-			*/
 		}
 
 		// Tear down the terminal.
-		/*
-		terminal.exitPrivateMode()
-		terminal.resetColorAndSGR()
-		terminal.close()
-		*/
 		println("Shutting down...")
 		m.shutdown()
 		println("Have a nice day.")
@@ -143,6 +130,16 @@ fun main(args: Array<String>) {
 	} else {
 		println("Unrecognized running mode: $args[0]")
 		println(USAGE)
+	}
+}
+
+private fun stringToMetric(met:String, default:DistanceMetric = DistanceMetric.EUCLIDEAN): DistanceMetric {
+	return when(met.toLowerCase()) {
+		DistanceMetric.EUCLIDEAN.name.toLowerCase() -> DistanceMetric.EUCLIDEAN
+		DistanceMetric.COSINE.name.toLowerCase() -> DistanceMetric.COSINE
+		DistanceMetric.MANHATTAN.name.toLowerCase() -> DistanceMetric.MANHATTAN
+		DistanceMetric.JENSENSHANNON.name.toLowerCase() -> DistanceMetric.JENSENSHANNON
+		else -> { default }
 	}
 }
 
@@ -163,3 +160,4 @@ private fun find(m:BDMaster, ctx: Context, k:Int, data:FloatArray, metric:Distan
 // This could use some explanation.
 // Start with a default value for the return.  If the item we encounter matches the string we're seeking, set accum (which will be returned) to the value of the next index.
 private fun findArgumentAfterString(str:String, args:Array<String>, default:String=""):String = args.foldRightIndexed(default, {ind, s, acc -> if(s.equals(str)) { args[ind+1] } else { acc }})
+

@@ -5,12 +5,14 @@ import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.net.ServerSocket
 import java.net.Socket
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Created by jcatrambone on 6/16/17.
+ * Created by jcatrambone on 2017/06/16.
  */
 class BDMaster(listeningPort:Int) {
-	var lastQueryID = 0
+	val dataPointCount: AtomicInteger = AtomicInteger()
+	val lastQueryID: AtomicInteger = AtomicInteger()
 	val listenerThreads = mutableListOf<Thread>()
 	private var quit = false
 	//val sock:ServerSocketChannel = ServerSocketChannel.open()
@@ -25,19 +27,19 @@ class BDMaster(listeningPort:Int) {
 		get() = workers.size
 
 	fun submitQuery(dataPoint: DataPoint, metric:DistanceMetric, numResults:Int): Int {
-		lastQueryID++
+		val qid = lastQueryID.incrementAndGet()
 		// A query goes to _all_ workers.
 		assert(workers.size > 0)
 		synchronized(workerReportsLeftToQueryCompletion, {
-			workerReportsLeftToQueryCompletion[lastQueryID] = mutableSetOf<Socket>()
+			workerReportsLeftToQueryCompletion[qid] = mutableSetOf<Socket>()
 		})
 		synchronized(pendingWorkerMessages, {
 			workers.forEach {
-				pendingWorkerMessages[it]!!.add(FindKNearestMessage(lastQueryID, numResults, metric, dataPoint))
-				workerReportsLeftToQueryCompletion[lastQueryID]!!.add(it)
+				pendingWorkerMessages[it]!!.add(FindKNearestMessage(qid, numResults, metric, dataPoint))
+				workerReportsLeftToQueryCompletion[qid]!!.add(it)
 			}
 		})
-		return lastQueryID
+		return qid
 	}
 
 	fun submitQuery(floatArray: FloatArray, metric:DistanceMetric, numResults:Int): Int {
@@ -63,7 +65,11 @@ class BDMaster(listeningPort:Int) {
 
 	fun addPoint(dataPoint: DataPoint) {
 		// A point is added only to one of the workers.
-		pendingWorkerMessages[workers[dataPoint.id % workers.size]]!!.add(AddMessage(dataPoint))
+		// If we use dataPoint.id, it assumes the IDs are fairly distributed, but that's not necessarily the case.
+		// TODO: Pick a better hash function for the id.
+		//val dp = dataPoint.id
+		val dp = dataPointCount.getAndIncrement()
+		pendingWorkerMessages[workers[dp % workers.size]]!!.add(AddMessage(dataPoint))
 	}
 
 	fun shutdown() {
@@ -125,7 +131,7 @@ class BDMaster(listeningPort:Int) {
 					synchronized(pendingWorkerMessages, { outboundMessages = pendingWorkerMessages[socket]!! })
 					while(outboundMessages.isNotEmpty()) {
 						val outboundMsg:NetworkMessage? = outboundMessages.removeAt(0) // Remove first.
-						if(outboundMsg == null) {
+						if(outboundMsg == null) { // Probably another thread is coming in and popping all the messages.
 							println("BDMaster: Somehow a null outbound message was placed on the queue.")
 							continue
 						}

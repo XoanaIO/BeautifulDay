@@ -155,6 +155,31 @@ enum class DistanceMetric : Serializable {
 		override fun calculateWithCutoff(p1:DataPoint, p2:DataPoint, cutoff:Float):Float? {
 			return null
 		}
+	},
+
+	JENSENSHANNON {
+		fun kullbackLeiblerDivergence(p:FloatArray, q:FloatArray): Float {
+			return p.zip(q).fold(0f, {accumulator, pq -> accumulator+(pq.first*Math.log(pq.first.toDouble()/(1e-8f+pq.second)).toFloat())})
+		}
+
+		override fun calculate(p1:DataPoint, p2:DataPoint):Float {
+			/*
+			val pExp = p1.data.fold(0f, {acc, v -> acc+Math.exp(v.toDouble()).toFloat()})
+			val qExp = p2.data.fold(0f, {acc, v -> acc+Math.exp(v.toDouble()).toFloat()})
+			val p = p1.data.map { Math.exp(it.toDouble()).toFloat()/pExp }.toFloatArray()
+			val q = p2.data.map { Math.exp(it.toDouble()).toFloat()/qExp }.toFloatArray()
+			*/
+			// If we uncomment the above, then we perform softmax on the input points.
+			// If you're using Jensen-Shannon Divergence, though, you should know that you use it with probability distributions.
+			val p = p1.data
+			val q = p2.data
+			val m = p.zip(q).map { pq -> 0.5f*(pq.first+pq.second) }.toFloatArray()
+			return 0.5f*kullbackLeiblerDivergence(p, m) + 0.5f*kullbackLeiblerDivergence(q, m)
+		}
+
+		override fun calculateWithCutoff(p1:DataPoint, p2:DataPoint, cutoff:Float):Float? {
+			return null
+		}
 	};
 
 	abstract fun calculate(p1:DataPoint, p2:DataPoint):Float

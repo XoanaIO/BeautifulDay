@@ -11,7 +11,8 @@ import java.util.Random;
 
 public class DistanceMetricTests {
 
-	@Test
+	// Cosine and KL don't define metric spaces.
+	//@Test
 	public void verifyMetricSpace() {
 		// The distance metrics should define a metric space:
 		// d(x,y) >= 0
@@ -57,16 +58,16 @@ public class DistanceMetricTests {
 	public void testEuclidean() {
 		DataPoint p1 = new DataPoint(1, new float[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
 		DataPoint p2 = new DataPoint(2, new float[]{0, 1, 0, 0, 0, 0, 0, 0, 0, 0});
-		Assert.assertEquals(1.0f, DistanceMetric.EUCLIDEAN.calculate(p1, p2), 1.0e-8);
-		Assert.assertEquals(0.0f, DistanceMetric.EUCLIDEAN.calculate(p2, p2), 1.0e-8);
+		Assert.assertEquals(1.0f, DistanceMetric.EUCLIDEAN.calculate(p1, p2), 1.0e-6);
+		Assert.assertEquals(0.0f, DistanceMetric.EUCLIDEAN.calculate(p2, p2), 1.0e-6);
 
 		p1 = new DataPoint(1, new float[]{1, 0});
 		p2 = new DataPoint(2, new float[]{0, 1});
-		Assert.assertEquals(Math.sqrt(2.0), DistanceMetric.EUCLIDEAN.calculate(p1, p2), 1.0e-8);
+		Assert.assertEquals(Math.sqrt(2.0), DistanceMetric.EUCLIDEAN.calculate(p1, p2), 1.0e-6);
 
 		p1 = new DataPoint(1, new float[]{3, 0});
 		p2 = new DataPoint(2, new float[]{0, 4});
-		Assert.assertEquals(5.0f, DistanceMetric.EUCLIDEAN.calculate(p1, p2), 1.0e-8);
+		Assert.assertEquals(5.0f, DistanceMetric.EUCLIDEAN.calculate(p1, p2), 1.0e-6);
 	}
 
 	@Test
@@ -111,5 +112,15 @@ public class DistanceMetricTests {
 			}
 		}
 		*/
+	}
+
+	@Test
+	public void testJS() {
+		DataPoint p0 = new DataPoint(0, new float[]{0.1f, 0.1f, 0.8f});
+		DataPoint p1 = new DataPoint(1, new float[]{0.0f, 1.0f, 0.0f});
+		DataPoint p2 = new DataPoint(2, new float[]{1.0f, 0.0f, 0.0f});
+
+		Assert.assertEquals(0.0f, DistanceMetric.JENSENSHANNON.calculate(p0, p0), 1.0e-6);
+		Assert.assertTrue(DistanceMetric.JENSENSHANNON.calculate(p0, p1) < DistanceMetric.JENSENSHANNON.calculate(p1, p2));
 	}
 }
